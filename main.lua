@@ -34,14 +34,14 @@ _G.VoltCleanup = function()
     end)
 end
 
--- Automatic Quest Loop Toggle Logic
+local _QuestsReady = false
 local function fireQuestRemotes()
     -- Esperar a que el personaje y el HumanoidRootPart existan
     local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
     char:WaitForChild("HumanoidRootPart", 10)
     
-    -- Un pequeño delay extra para asegurar que los remotos del servidor ya respondan
-    task.wait(2)
+    -- Delay aumentado a 4 segundos como pediste
+    task.wait(4)
     
     local remotes = ReplicatedStorage:WaitForChild("Remotes", 10)
     local toggleQuest = remotes and remotes:WaitForChild("ToggleQuestLoop", 10)
@@ -51,6 +51,7 @@ local function fireQuestRemotes()
         task.wait(0.5)
         pcall(function() toggleQuest:FireServer(2) end)
     end
+    _QuestsReady = true
 end
 
 -- Run on startup
@@ -1250,6 +1251,7 @@ end
 local MainTab = createTab("Farming", "⚔️")
 local TowerTab = createTab("Tower", "🏰")
 local ChestsTab = createTab("Chests", "🎁")
+local MiscTab = createTab("Misc", "🌐")
 local SettingsTab = createTab("Settings", "⚙️")
 
 -- Add elements to Main Tab
@@ -1355,6 +1357,59 @@ createToggle(ChestsTab, "Auto Epic Chest", Config.AutoEpicChest, function(state)
 createToggle(ChestsTab, "Auto Legendary Chest", Config.AutoLegendaryChest, function(state) Config.AutoLegendaryChest = state end)
 createToggle(ChestsTab, "Auto Mythic Chest", Config.AutoMythicChest, function(state) Config.AutoMythicChest = state end)
 createToggle(ChestsTab, "Auto Secret Chest", Config.AutoSecretChest, function(state) Config.AutoSecretChest = state end)
+
+-- Add elements to Misc Tab
+local function createButton(parent, text, callback)
+    local ButtonFrame = Instance.new("Frame")
+    ButtonFrame.Parent = parent
+    ButtonFrame.BackgroundColor3 = Color3.fromRGB(22, 22, 34)
+    ButtonFrame.Size = UDim2.new(1, 0, 0, 38)
+    ButtonFrame.BorderSizePixel = 0
+    local Corner = Instance.new("UICorner")
+    Corner.CornerRadius = UDim.new(0, 8)
+    Corner.Parent = ButtonFrame
+    
+    local Btn = Instance.new("TextButton")
+    Btn.Parent = ButtonFrame
+    Btn.BackgroundTransparency = 1
+    Btn.Size = UDim2.new(1, 0, 1, 0)
+    Btn.Font = Enum.Font.GothamBold
+    Btn.Text = text
+    Btn.TextColor3 = Color3.fromRGB(200, 205, 220)
+    Btn.TextSize = 13
+    Btn.MouseButton1Click:Connect(callback)
+    
+    return ButtonFrame
+end
+
+createButton(MiscTab, "Server Hop (Next Server)", function() safeHop(serverHop) end)
+createButton(MiscTab, "Rejoin (Same Server)", function() safeHop(reJoin) end)
+createButton(MiscTab, "Fast Shutdown", safeShutdown)
+
+-- Auto Execute (Queue on Teleport) logic
+local function setupAutoExecute()
+    local loader = 'loadstring(game:HttpGet("https://raw.githubusercontent.com/Jairoxdhola/pirate-piece/main/main.lua?t=" .. tick()))()'
+    if syn and syn.queue_on_teleport then
+        syn.queue_on_teleport(loader)
+    elseif queue_on_teleport then
+        queue_on_teleport(loader)
+    end
+end
+
+local AutoExecuteEnabled = true
+createToggle(MiscTab, "Auto-Execute on Teleport", true, function(state)
+    AutoExecuteEnabled = state
+    if state then setupAutoExecute() end
+end)
+
+-- Execute it once at start if enabled
+if AutoExecuteEnabled then setupAutoExecute() end
+
+-- Also ensure it's queued before manual hops
+local function safeHop(fn)
+    if AutoExecuteEnabled then setupAutoExecute() end
+    fn()
+end
 
 -- Settings UI
 createDynamicDropdown(SettingsTab, "Auto Equip Tool", Config.SelectedWeapon, function()
@@ -1565,7 +1620,8 @@ task.spawn(function()
 
     while task.wait() do
         if _G.VoltPiratePieceStop then break end
-        local activeIsland = nil
+        if _QuestsReady then
+            local activeIsland = nil
         if     Config.Island1 then activeIsland = "island1"
         elseif Config.Island2 then activeIsland = "island2"
         elseif Config.Island3 then activeIsland = "island3"
@@ -1683,10 +1739,9 @@ task.spawn(function()
             else
                 removeBV(myHrp)
             end
-        else
-            removeBV(myHrp)
         end
     end
+end
 end)
 
 -- Auto Open Chests Logic
