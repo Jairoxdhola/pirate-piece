@@ -56,9 +56,6 @@ end
 -- Run on startup
 task.spawn(fireQuestRemotes)
 
--- Run on shutdown/exit
-game:BindToClose(fireQuestRemotes)
-
 -- Helper Functions (for RJ, ServerHop, Shutdown)
 local function serverHop()
     fireQuestRemotes()
