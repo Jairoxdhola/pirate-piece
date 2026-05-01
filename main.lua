@@ -34,6 +34,51 @@ _G.VoltCleanup = function()
     end)
 end
 
+-- Automatic Quest Loop Toggle Logic
+local function fireQuestRemotes()
+    local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+    local toggleQuest = remotes and remotes:FindFirstChild("ToggleQuestLoop")
+    if toggleQuest then
+        pcall(function() toggleQuest:FireServer(1) end)
+        task.wait(0.2)
+        pcall(function() toggleQuest:FireServer(2) end)
+    end
+end
+
+-- Run on startup
+task.spawn(fireQuestRemotes)
+
+-- Run on shutdown/exit
+game:BindToClose(fireQuestRemotes)
+
+-- Helper Functions (for RJ, ServerHop, Shutdown)
+local function serverHop()
+    fireQuestRemotes()
+    task.wait(0.5)
+    local Http = game:GetService("HttpService")
+    local TPS = game:GetService("TeleportService")
+    local Api = "https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Desc&limit=100"
+    local function GetServers(cursor)
+        local Raw = game:HttpGet(Api .. (cursor and "&cursor=" .. cursor or ""))
+        return Http:JSONDecode(Raw)
+    end
+    local Servers = GetServers()
+    local Server = Servers.data[math.random(1, #Servers.data)]
+    TPS:TeleportToPlaceInstance(game.PlaceId, Server.id, LocalPlayer)
+end
+
+local function reJoin()
+    fireQuestRemotes()
+    task.wait(0.5)
+    game:GetService("TeleportService"):Teleport(game.PlaceId, LocalPlayer)
+end
+
+local function safeShutdown()
+    fireQuestRemotes()
+    task.wait(0.5)
+    LocalPlayer:Kick("Safe Shutdown Initiated")
+end
+
 -- Configuration & State
 local Config = {
     Island1 = false,
@@ -1528,111 +1573,110 @@ task.spawn(function()
         local character = LocalPlayer.Character
         local humanoid = character and character:FindFirstChildWhichIsA("Humanoid")
         local myHrp = character and character:FindFirstChild("HumanoidRootPart")
-        if not (humanoid and humanoid.Health > 0 and myHrp) then
-            removeBV(myHrp)
-            continue
-        end
+        if humanoid and humanoid.Health > 0 and myHrp then
+            local gameFolder = workspace:FindFirstChild("Game")
+            local enemyNpcs = gameFolder and gameFolder:FindFirstChild("EnemyNpcs")
 
-        local gameFolder = workspace:FindFirstChild("Game")
-        local enemyNpcs = gameFolder and gameFolder:FindFirstChild("EnemyNpcs")
-
-        if activeIsland then
-            local enemy = getEnemy(activeIsland)
-            if enemy then
-                local enemyHrp = enemy:FindFirstChild("HumanoidRootPart")
-                if enemyHrp then performAttack(enemyHrp, myHrp) end
-            else
-                removeBV(myHrp)
-            end
-
-        elseif Config.AutoTower then
-            local enemy = getTowerEnemy()
-            if enemy then
-                local enemyHrp = enemy:FindFirstChild("HumanoidRootPart")
-                if enemyHrp then performAttack(enemyHrp, myHrp) end
-            else
-                removeBV(myHrp)
-            end
-
-        elseif Config.AutoBoss then
-            local data = BossData[Config.SelectedBoss]
-            if data and enemyNpcs then
-                local bossIsland = enemyNpcs:FindFirstChild(data.Island)
-                local bossModel = bossIsland and bossIsland:FindFirstChild(Config.SelectedBoss)
-                local bossHumanoid = bossModel and (bossModel:FindFirstChild("Humanoid") or bossModel:FindFirstChildWhichIsA("Humanoid"))
-                local bossHrp = bossModel and bossModel:FindFirstChild("HumanoidRootPart")
-
-                if bossHumanoid and bossHrp and bossHumanoid.Health > 0 then
-                    if not bossQuestTaken then
-                        local serviceNpcs = gameFolder:FindFirstChild("ServiceNpcs")
-                        local questGivers = serviceNpcs and serviceNpcs:FindFirstChild("QuestGivers")
-                        local questGiver = questGivers and questGivers:FindFirstChild(data.Giver)
-                        local promptPart = questGiver and questGiver:FindFirstChild("nameDontMatterQu3stG1v3rP4rt")
-                        local prompt = promptPart and promptPart:FindFirstChild("nameDontMatterProximityPrompt")
-                        if promptPart and prompt then
-                            removeBV(myHrp)
-                            myHrp.CFrame = promptPart.CFrame * CFrame.new(0, 3, 3)
-                            task.wait(0.2)
-                            pcall(function() fireproximityprompt(prompt) end)
-                            task.wait(0.2)
-                            bossQuestTaken = true
-                        end
-                    else
-                        performAttack(bossHrp, myHrp)
-                    end
+            if activeIsland then
+                local enemy = getEnemy(activeIsland)
+                if enemy then
+                    local enemyHrp = enemy:FindFirstChild("HumanoidRootPart")
+                    if enemyHrp then performAttack(enemyHrp, myHrp) end
                 else
-                    bossQuestTaken = false
                     removeBV(myHrp)
                 end
-            end
 
-        elseif Config.AllNPCs or Config.AllBosses or Config.AllFarm then
-            local islandKey = "island" .. currentAllFarmIsland
-            local islandF = enemyNpcs and enemyNpcs:FindFirstChild(islandKey)
-            local attacked = false
+            elseif Config.AutoTower then
+                local enemy = getTowerEnemy()
+                if enemy then
+                    local enemyHrp = enemy:FindFirstChild("HumanoidRootPart")
+                    if enemyHrp then performAttack(enemyHrp, myHrp) end
+                else
+                    removeBV(myHrp)
+                end
 
-            if islandF then
-                if Config.AllNPCs or Config.AllFarm then
-                    for _, child in ipairs(islandF:GetChildren()) do
-                        if child:IsA("Model") and not isBossName[child.Name] then
-                            local h = child:FindFirstChildWhichIsA("Humanoid")
-                            local hrp = child:FindFirstChild("HumanoidRootPart")
-                            if h and hrp and h.Health > 0 then
-                                performAttack(hrp, myHrp)
-                                attacked = true
-                                break
+            elseif Config.AutoBoss then
+                local data = BossData[Config.SelectedBoss]
+                if data and enemyNpcs then
+                    local bossIsland = enemyNpcs:FindFirstChild(data.Island)
+                    local bossModel = bossIsland and bossIsland:FindFirstChild(Config.SelectedBoss)
+                    local bossHumanoid = bossModel and (bossModel:FindFirstChild("Humanoid") or bossModel:FindFirstChildWhichIsA("Humanoid"))
+                    local bossHrp = bossModel and bossModel:FindFirstChild("HumanoidRootPart")
+
+                    if bossHumanoid and bossHrp and bossHumanoid.Health > 0 then
+                        if not bossQuestTaken then
+                            local serviceNpcs = gameFolder:FindFirstChild("ServiceNpcs")
+                            local questGivers = serviceNpcs and serviceNpcs:FindFirstChild("QuestGivers")
+                            local questGiver = questGivers and questGivers:FindFirstChild(data.Giver)
+                            local promptPart = questGiver and questGiver:FindFirstChild("nameDontMatterQu3stG1v3rP4rt")
+                            local prompt = promptPart and promptPart:FindFirstChild("nameDontMatterProximityPrompt")
+                            if promptPart and prompt then
+                                removeBV(myHrp)
+                                myHrp.CFrame = promptPart.CFrame * CFrame.new(0, 3, 3)
+                                task.wait(0.2)
+                                pcall(function() fireproximityprompt(prompt) end)
+                                task.wait(0.2)
+                                bossQuestTaken = true
+                            end
+                        else
+                            performAttack(bossHrp, myHrp)
+                        end
+                    else
+                        bossQuestTaken = false
+                        removeBV(myHrp)
+                    end
+                end
+
+            elseif Config.AllNPCs or Config.AllBosses or Config.AllFarm then
+                local islandKey = "island" .. currentAllFarmIsland
+                local islandF = enemyNpcs and enemyNpcs:FindFirstChild(islandKey)
+                local attacked = false
+
+                if islandF then
+                    if Config.AllNPCs or Config.AllFarm then
+                        for _, child in ipairs(islandF:GetChildren()) do
+                            if child:IsA("Model") and not isBossName[child.Name] then
+                                local h = child:FindFirstChildWhichIsA("Humanoid")
+                                local hrp = child:FindFirstChild("HumanoidRootPart")
+                                if h and hrp and h.Health > 0 then
+                                    performAttack(hrp, myHrp)
+                                    attacked = true
+                                    break
+                                end
+                            end
+                        end
+                    end
+                    if not attacked and (Config.AllBosses or Config.AllFarm) then
+                        for _, entry in ipairs(AllBossList) do
+                            if entry.Island == islandKey then
+                                local boss = islandF:FindFirstChild(entry.Name)
+                                local h = boss and (boss:FindFirstChild("Humanoid") or boss:FindFirstChildWhichIsA("Humanoid"))
+                                local hrp = boss and boss:FindFirstChild("HumanoidRootPart")
+                                if h and hrp and h.Health > 0 then
+                                    performAttack(hrp, myHrp)
+                                    attacked = true
+                                    break
+                                end
                             end
                         end
                     end
                 end
-                if not attacked and (Config.AllBosses or Config.AllFarm) then
-                    for _, entry in ipairs(AllBossList) do
-                        if entry.Island == islandKey then
-                            local boss = islandF:FindFirstChild(entry.Name)
-                            local h = boss and (boss:FindFirstChild("Humanoid") or boss:FindFirstChildWhichIsA("Humanoid"))
-                            local hrp = boss and boss:FindFirstChild("HumanoidRootPart")
-                            if h and hrp and h.Health > 0 then
-                                performAttack(hrp, myHrp)
-                                attacked = true
-                                break
-                            end
-                        end
+
+                if not attacked then
+                    removeBV(myHrp)
+                    if os.clock() - lastIslandSwitch >= 2 then
+                        currentAllFarmIsland = currentAllFarmIsland % 7 + 1
+                        pcall(function()
+                            local ev = ReplicatedStorage:FindFirstChild("Remotes")
+                                and ReplicatedStorage.Remotes:FindFirstChild("Events")
+                                and ReplicatedStorage.Remotes.Events:FindFirstChild("TeleportToIslandRequest")
+                            if ev then ev:FireServer("island" .. currentAllFarmIsland) end
+                        end)
+                        lastIslandSwitch = os.clock()
                     end
                 end
-            end
-
-            if not attacked then
+            else
                 removeBV(myHrp)
-                if os.clock() - lastIslandSwitch >= 2 then
-                    currentAllFarmIsland = currentAllFarmIsland % 7 + 1
-                    pcall(function()
-                        local ev = ReplicatedStorage:FindFirstChild("Remotes")
-                            and ReplicatedStorage.Remotes:FindFirstChild("Events")
-                            and ReplicatedStorage.Remotes.Events:FindFirstChild("TeleportToIslandRequest")
-                        if ev then ev:FireServer("island" .. currentAllFarmIsland) end
-                    end)
-                    lastIslandSwitch = os.clock()
-                end
             end
         else
             removeBV(myHrp)
