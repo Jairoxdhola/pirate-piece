@@ -36,11 +36,19 @@ end
 
 -- Automatic Quest Loop Toggle Logic
 local function fireQuestRemotes()
-    local remotes = ReplicatedStorage:FindFirstChild("Remotes")
-    local toggleQuest = remotes and remotes:FindFirstChild("ToggleQuestLoop")
+    -- Esperar a que el personaje y el HumanoidRootPart existan
+    local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    char:WaitForChild("HumanoidRootPart", 10)
+    
+    -- Un pequeño delay extra para asegurar que los remotos del servidor ya respondan
+    task.wait(2)
+    
+    local remotes = ReplicatedStorage:WaitForChild("Remotes", 10)
+    local toggleQuest = remotes and remotes:WaitForChild("ToggleQuestLoop", 10)
+    
     if toggleQuest then
         pcall(function() toggleQuest:FireServer(1) end)
-        task.wait(0.2)
+        task.wait(0.5)
         pcall(function() toggleQuest:FireServer(2) end)
     end
 end
