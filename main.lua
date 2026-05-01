@@ -14,6 +14,26 @@ local VirtualUser = game:GetService("VirtualUser")
 
 local HttpService = game:GetService("HttpService")
 
+-- Cleanup previous execution
+if _G.VoltCleanup then
+    pcall(_G.VoltCleanup)
+end
+
+_G.VoltPiratePieceStop = false
+_G.VoltCleanup = function()
+    _G.VoltPiratePieceStop = true
+    local ui = CoreGui:FindFirstChild("VoltPiratePieceUI")
+    if ui then ui:Destroy() end
+    
+    pcall(function()
+        local char = LocalPlayer.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        if hrp and hrp:FindFirstChild("VoltFarmBV") then
+            hrp.VoltFarmBV:Destroy()
+        end
+    end)
+end
+
 -- Configuration & State
 local Config = {
     Island1 = false,
@@ -848,7 +868,8 @@ local function createSlider(parent, text, min, max, default, callback)
     
     local dragging = false
     local function updateSlider(input)
-        local pos = math.clamp((input.Position.X - SliderBG.AbsolutePosition.X) / SliderBG.AbsoluteSize.X, 0, 1)
+        local inputPos = input.Position.X
+        local pos = math.clamp((inputPos - SliderBG.AbsolutePosition.X) / SliderBG.AbsoluteSize.X, 0, 1)
         local value = math.floor(min + (max - min) * pos)
         ValueLabel.Text = tostring(value)
         TweenService:Create(SliderFill, TweenInfo.new(0.08), {Size = UDim2.new(pos, 0, 1, 0)}):Play()
@@ -856,14 +877,14 @@ local function createSlider(parent, text, min, max, default, callback)
     end
     
     SliderButton.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             dragging = true
             updateSlider(input)
         end
     end)
     
     UserInputService.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             if dragging then
                 dragging = false
                 saveConfig()
@@ -872,7 +893,7 @@ local function createSlider(parent, text, min, max, default, callback)
     end)
     
     UserInputService.InputChanged:Connect(function(input)
-        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
             updateSlider(input)
         end
     end)
@@ -1493,6 +1514,7 @@ task.spawn(function()
     end
 
     while task.wait() do
+        if _G.VoltPiratePieceStop then break end
         local activeIsland = nil
         if     Config.Island1 then activeIsland = "island1"
         elseif Config.Island2 then activeIsland = "island2"
@@ -1621,6 +1643,7 @@ end)
 -- Auto Open Chests Logic
 task.spawn(function()
     while task.wait(0.1) do
+        if _G.VoltPiratePieceStop then break end
         local useItemEvent
         pcall(function()
             useItemEvent = ReplicatedStorage:FindFirstChild("Remotes") and ReplicatedStorage.Remotes:FindFirstChild("Events") and ReplicatedStorage.Remotes.Events:FindFirstChild("UseInventoryItem")
@@ -1640,6 +1663,7 @@ end)
 -- Auto Equip Logic
 task.spawn(function()
     while task.wait(0.5) do
+        if _G.VoltPiratePieceStop then break end
         if Config.AutoEquip and Config.SelectedWeapon ~= "" then
             pcall(function()
                 local character = LocalPlayer.Character
@@ -1662,6 +1686,7 @@ end)
 
 task.spawn(function()
     while task.wait(1.5) do
+        if _G.VoltPiratePieceStop then break end
         if Config.AutoHaki then
             local char = LocalPlayer.Character
             if char and char:FindFirstChild("Humanoid") and char.Humanoid.Health > 0 then
