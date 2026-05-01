@@ -841,8 +841,8 @@ local function createSlider(parent, text, min, max, default, callback)
     local SliderButton = Instance.new("TextButton")
     SliderButton.Parent = SliderBG
     SliderButton.BackgroundTransparency = 1
-    SliderButton.Size = UDim2.new(1, 0, 1, 10)
-    SliderButton.Position = UDim2.new(0, 0, 0, -5)
+    SliderButton.Size = UDim2.new(1, 20, 0, 40)
+    SliderButton.Position = UDim2.new(0, -10, 0, -17)
     SliderButton.Text = ""
     SliderButton.ZIndex = 6
     
@@ -1411,8 +1411,8 @@ local function getEnemy(islandFolderStr)
 end
 
 local function getTowerEnemy()
-    local tower = workspace:FindFirstChild("infinite Tower")
-    local enemies = tower and tower:FindFirstChild("RuntimeEnemies")
+    local tower = workspace:FindFirstChild("infinite Tower") or workspace:FindFirstChild("Infinite Tower")
+    local enemies = tower and (tower:FindFirstChild("RuntimeEnemies") or tower:FindFirstChild("enemies"))
     if not enemies then return nil end
     
     for _, enemy in ipairs(enemies:GetChildren()) do
@@ -1695,3 +1695,72 @@ task.spawn(function()
         end
     end
 end)
+
+-- Floating Toggle Button
+local FloatButton = Instance.new("TextButton")
+FloatButton.Name = "FloatButton"
+FloatButton.Parent = ScreenGui
+FloatButton.BackgroundColor3 = Color3.fromRGB(22, 22, 32)
+FloatButton.Position = UDim2.new(0, 20, 0.5, -25)
+FloatButton.Size = UDim2.new(0, 50, 0, 50)
+FloatButton.Text = "⚡"
+FloatButton.TextColor3 = Color3.fromRGB(80, 120, 255)
+FloatButton.Font = Enum.Font.GothamBold
+FloatButton.TextSize = 24
+FloatButton.ZIndex = 1000
+FloatButton.AutoButtonColor = false
+
+local FloatCorner = Instance.new("UICorner")
+FloatCorner.CornerRadius = UDim.new(1, 0)
+FloatCorner.Parent = FloatButton
+
+local FloatStroke = Instance.new("UIStroke")
+FloatStroke.Parent = FloatButton
+FloatStroke.Thickness = 2
+FloatStroke.Color = Color3.fromRGB(80, 120, 255)
+FloatStroke.Transparency = 0.5
+
+local FloatGrad = Instance.new("UIGradient")
+FloatGrad.Parent = FloatButton
+FloatGrad.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(80, 120, 255)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(160, 100, 255))
+})
+
+-- Dragging for FloatButton
+local f_dragging = false
+local f_dragInput, f_mousePos, f_framePos
+
+FloatButton.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        f_dragging = true
+        f_mousePos = input.Position
+        f_framePos = FloatButton.Position
+        
+        local connection
+        connection = input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                f_dragging = false
+                if connection then connection:Disconnect() end
+            end
+        end)
+    end
+end)
+
+FloatButton.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        f_dragInput = input
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if input == f_dragInput and f_dragging then
+        local delta = input.Position - f_mousePos
+        FloatButton.Position = UDim2.new(f_framePos.X.Scale, f_framePos.X.Offset + delta.X, f_framePos.Y.Scale, f_framePos.Y.Offset + delta.Y)
+    end
+end)
+
+FloatButton.MouseButton1Click:Connect(function()
+    MainFrame.Visible = not MainFrame.Visible
+end)
+
